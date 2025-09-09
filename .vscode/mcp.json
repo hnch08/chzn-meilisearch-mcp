@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"my-mcp-server-5d3a5fab": {
+			"url": "http://127.0.0.1:8800/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}
