@@ -1,10 +1,10 @@
 # MeiliSearch MCP Server
 
-这是一个用于查询MeiliSearch的MCP服务器实现，支持关键词搜索和多种筛选条件。
+这是一个用于查询MeiliSearch的MCP服务器实现，专门用于查询'supply_demands'索引，支持关键词搜索和多种筛选条件。
 
 ## 功能特性
 
-- 关键词搜索
+- 关键词搜索（专门针对'supply_demands'索引）
 - 多种筛选条件支持：
   - 等值筛选
   - 范围筛选 (gt, gte, lt, lte, ne)
@@ -14,7 +14,7 @@
 - 分页支持
 - 错误处理
 - 索引统计信息查询
-- 索引列表查询
+- 索引初始化配置
 
 ## 安装依赖
 
@@ -66,7 +66,7 @@ fastmcp run server.py
 
 ## 数据字段说明
 
-根据你提供的数据，索引中的文档包含以下字段：
+根据你提供的数据，'supply_demands'索引中的文档包含以下字段：
 
 - `id`: 唯一标识符
 - `title`: 标题
@@ -88,13 +88,12 @@ fastmcp run server.py
 
 ## 可用工具函数
 
-### 1. search_meilisearch
+### 1. search_supply_demands
 
-执行MeiliSearch查询。
+执行针对'supply_demands'索引的MeiliSearch查询。
 
 **参数：**
 - `query` (str): 搜索关键词
-- `index_name` (str): 索引名称
 - `filter_conditions` (dict, 可选): 筛选条件
 - `limit` (int, 默认20): 返回结果数量限制
 - `offset` (int, 默认0): 偏移量
@@ -105,12 +104,11 @@ fastmcp run server.py
 
 ```python
 # 基本关键词搜索
-search_meilisearch("瓦楞纸箱", "products")
+search_supply_demands("瓦楞纸箱")
 
 # 带筛选条件的搜索
-search_meilisearch(
+search_supply_demands(
     "瓦楞纸箱", 
-    "products", 
     filter_conditions={
         "category": "瓦楞纸箱",
         "quantity": {"gte": 1000},
@@ -119,9 +117,8 @@ search_meilisearch(
 )
 
 # 带排序和字段筛选的搜索
-search_meilisearch(
+search_supply_demands(
     "纸箱",
-    "products",
     filter_conditions={
         "category": ["瓦楞纸箱", "包装盒"],
         "quantity": {"gte": 500}
@@ -132,9 +129,8 @@ search_meilisearch(
 )
 
 # 搜索特定价格范围的产品
-search_meilisearch(
+search_supply_demands(
     "瓦楞纸箱",
-    "products",
     filter_conditions={
         "category": "瓦楞纸箱",
         "price": {"gte": 10, "lte": 100}
@@ -144,25 +140,22 @@ search_meilisearch(
 )
 ```
 
-### 2. get_index_stats
+### 2. get_supply_demands_stats
 
-获取指定索引的统计信息。
-
-**参数：**
-- `index_name` (str): 索引名称
+获取'supply_demands'索引的统计信息。
 
 **示例用法：**
 ```python
-get_index_stats("products")
+get_supply_demands_stats()
 ```
 
-### 3. get_all_indexes
+### 3. init_supply_demands_index
 
-获取所有索引的列表。
+初始化'supply_demands'索引的配置，包括可搜索字段、可过滤字段、排序字段、显示字段和同义词等。
 
 **示例用法：**
 ```python
-get_all_indexes()
+init_supply_demands_index()
 ```
 
 ## 筛选条件语法
@@ -200,6 +193,64 @@ get_all_indexes()
 ["price:asc"]          # 按价格升序排列
 ["quantity:desc", "price:asc"]  # 多字段排序
 ```
+
+## 索引配置详情
+
+'supply_demands'索引已配置以下参数：
+
+### 可搜索字段
+- title
+- description
+- productName
+- category
+- companyName
+- areaName
+- contactName
+
+### 可过滤字段
+- type
+- category
+- status
+- companyName
+- areaName
+- createdAt
+- updatedAt
+- expiresAt
+
+### 可排序字段
+- createdAt
+- updatedAt
+- price
+- quantity
+
+### 显示字段
+- id
+- title
+- description
+- type
+- category
+- productName
+- quantity
+- unit
+- price
+- currency
+- companyName
+- areaName
+- contactName
+- contactPhone
+- createdAt
+- updatedAt
+- expiresAt
+
+### 同义词
+- '采购': ['购买', '求购', '需求', '采买']
+- '需求': ['求购', '采购', '需要', '要求']
+- '供应': ['提供', '出售', '销售', '供给']
+- '销售': ['出售', '供应', '提供', '卖']
+- '计划': ['方案', '安排', '规划']
+- '今日': ['今天', '当日', '本日']
+- '产品': ['商品', '货物', '物品']
+- '服务': ['业务', '项目']
 
 ## 配置
 
