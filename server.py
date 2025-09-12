@@ -160,6 +160,155 @@ def search_supply_demands(
         }
 
 
+@mcp.tool
+def search_policies(
+    query: str,
+    filter_conditions: Optional[Dict[str, Any]] = None,
+    limit: int = 20,
+    offset: int = 0,
+    attributes_to_retrieve: Optional[List[str]] = None,
+    sort: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """
+    查询MeiliSearch中的policies索引
+
+    Args:
+        query: 搜索关键词
+        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如publishDate, effectDate, expireDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
+        limit: 返回结果数量限制，默认20
+        offset: 偏移量，默认0
+        attributes_to_retrieve: 指定要返回的字段列表，可选
+        sort: 排序规则列表，可选
+
+    Returns:
+        搜索结果字典
+
+    政策索引字段说明:
+        - id: 唯一标识符
+        - title: 标题
+        - content: 内容
+        - category: 分类
+        - status: 状态
+        - statusText: 状态文本
+        - publishDate: 发布日期
+        - effectDate: 生效日期
+        - expireDate: 失效日期
+        - author: 作者
+        - tags: 标签
+        - priority: 优先级
+        - viewCount: 查看次数
+        - version: 版本
+        - createdAt: 创建时间
+        - updatedAt: 更新时间
+        - areaNames: 地区名称列表
+        - areaIds: 地区ID列表
+
+    示例:
+        # 基本关键词搜索
+        search_policies("税收优惠政策")
+
+        # 按分类筛选
+        search_policies(
+            "", 
+            filter_conditions={
+                "category": "税收政策"
+            }
+        )
+
+        # 按时间范围搜索
+        search_policies(
+            "",
+            filter_conditions={
+                "publishDate": {"gte": "2025-01-01T00:00:00.000Z", "lte": "2025-12-31T23:59:59.999Z"}
+            },
+            sort=["publishDate:desc"]
+        )
+
+        # 按地区搜索
+        search_policies(
+            "",
+            filter_conditions={
+                "areaNames": "湖南省"
+            }
+        )
+
+        # 复合条件搜索
+        search_policies(
+            "小微企业",
+            filter_conditions={
+                "category": ["税收政策", "财政政策"],
+                "status": "active"
+            },
+            sort=["publishDate:desc"],
+            attributes_to_retrieve=["id", "title", "category", "publishDate", "author", "areaNames"],
+            limit=10
+        )
+    """
+    try:
+        # 从环境变量获取MeiliSearch配置
+        MEILISEARCH_URL = os.getenv("MEILISEARCH_URL", "http://localhost:7700")
+        MEILISEARCH_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY", "")
+
+        # 固定查询policies索引
+        INDEX_NAME = "policies"
+
+        # 创建MeiliSearch客户端
+        client = Client(MEILISEARCH_URL, MEILISEARCH_MASTER_KEY)
+
+        # 获取索引
+        index = client.index(INDEX_NAME)
+
+        # 构建搜索参数
+        search_params: dict[str, Any] = {
+            'hitsPerPage': limit,
+            'offset': offset
+        }
+
+        # 添加可选参数
+        if attributes_to_retrieve:
+            search_params['attributesToRetrieve'] = attributes_to_retrieve
+
+        if sort:
+            search_params['sort'] = sort
+
+        # 处理筛选条件
+        if filter_conditions:
+            filter_expressions = _build_filter_expressions(filter_conditions)
+            if filter_expressions:
+                search_params['filter'] = filter_expressions
+
+        # 执行搜索
+        results = index.search(query, search_params)
+
+        # 安全地获取结果字段
+        hits = results.get("hits", [])
+        return {
+            "success": True,
+            "data": hits,
+            "count": len(hits),
+            "message": f"找到{len(hits)}条政策信息"
+        }
+
+    except errors.MeilisearchApiError as e:
+        return {
+            "success": False,
+            "error": f"MeiliSearch API错误: {str(e)}",
+            "error_code": getattr(e, 'code', 'unknown')
+        }
+    except errors.MeilisearchCommunicationError as e:
+        return {
+            "success": False,
+            "error": f"MeiliSearch连接错误: {str(e)}",
+            "error_type": "communication_error"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"未知错误: {str(e)}",
+            "error_type": "unknown_error"
+        }
+
+
 def _build_filter_expressions(filter_conditions: Dict[str, Any]) -> List[str]:
     """
     构建MeiliSearch筛选表达式
