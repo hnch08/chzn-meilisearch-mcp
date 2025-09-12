@@ -67,7 +67,7 @@ def search_supply_demands(
             sort=["createdAt:desc"],
             limit=5
         )
-        
+
         # 按公司名称搜索
         search_supply_demands(
             "测试有限公司",
@@ -76,7 +76,7 @@ def search_supply_demands(
             },
             sort=["createdAt:desc"]
         )
-        
+
         # 按地区搜索
         search_supply_demands(
             "",
@@ -85,7 +85,7 @@ def search_supply_demands(
             },
             sort=["createdAt:desc"]
         )
-        
+
         # 按时间范围搜索
         search_supply_demands(
             "",
@@ -132,13 +132,12 @@ def search_supply_demands(
         results = index.search(query, search_params)
 
         # 安全地获取结果字段
+        hits = results.get("hits", [])
         return {
             "success": True,
-            "hits": results.get("hits", []),
-            "estimated_total_hits": results.get("estimatedTotalHits") or results.get("nbHits", 0),
-            "limit": results.get("hitsPerPage") or results.get("limit", limit),
-            "offset": results.get("offset", offset),
-            "processing_time_ms": results.get("processingTimeMs", 0)
+            "data": hits,
+            "count": len(hits),
+            "message": f"找到{len(hits)}条供需信息"
         }
 
     except errors.MeilisearchApiError as e:
@@ -184,7 +183,8 @@ def _build_filter_expressions(filter_conditions: Dict[str, Any]) -> List[str]:
             # 处理数组值的情况 (IN查询)
             if len(value) > 0:
                 # 转义特殊字符并构建表达式
-                escaped_values = [_escape_filter_value(v, key in time_fields) for v in value]
+                escaped_values = [_escape_filter_value(
+                    v, key in time_fields) for v in value]
                 values_str = ", ".join(escaped_values)
                 filter_expressions.append(f"{key} IN [{values_str}]")
         elif isinstance(value, dict):
@@ -207,8 +207,9 @@ def _build_filter_expressions(filter_conditions: Dict[str, Any]) -> List[str]:
                         f"{key} != {_escape_filter_value(val, key in time_fields)}")
         else:
             # 处理单个值的情况
-            filter_expressions.append(f"{key} = {_escape_filter_value(value, key in time_fields)}")
-
+            filter_expressions.append(
+                f"{key} = {_escape_filter_value(value, key in time_fields)}")
+    print(filter_expressions)
     return filter_expressions
 
 
@@ -231,7 +232,8 @@ def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
         import datetime
         try:
             # 假设是秒级时间戳
-            dt = datetime.datetime.fromtimestamp(value, tz=datetime.timezone.utc)
+            dt = datetime.datetime.fromtimestamp(
+                value, tz=datetime.timezone.utc)
             value = dt.isoformat().replace('+00:00', 'Z')
         except (ValueError, OSError):
             # 如果转换失败，保持原值
