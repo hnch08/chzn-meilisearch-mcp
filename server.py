@@ -530,6 +530,72 @@ def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
         return str(value)
 
 
+@mcp.tool
+def get_area_names() -> Dict[str, Any]:
+    """
+    获取所有索引中的地区名称(areaName)，包括companies和supply_demands
+    
+    Returns:
+        包含所有地区名称列表的字典
+    """
+    try:
+        # 从环境变量获取MeiliSearch配置
+        MEILISEARCH_URL = os.getenv("MEILISEARCH_URL", "http://localhost:7700")
+        MEILISEARCH_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY", "")
+
+        # 创建MeiliSearch客户端
+        client = Client(MEILISEARCH_URL, MEILISEARCH_MASTER_KEY)
+        
+        # 定义要查询的索引列表
+        index_names = ["companies", "supply_demands"]
+        all_area_names = set()  # 使用集合避免重复
+        
+        # 遍历每个索引获取areaName
+        for index_name in index_names:
+            try:
+                # 获取索引
+                index = client.index(index_name)
+                
+                # 执行搜索并获取facet分布
+                search_params = {
+                    'facets': ['areaName'],
+                    'hitsPerPage': 0  # 我们只需要facet信息，不需要实际的文档
+                }
+                
+                results = index.search("", search_params)
+                
+                # 从facetDistribution中提取地区名称
+                facet_distribution = results.get("facetDistribution", {})
+                area_names = list(facet_distribution.get("areaName", {}).keys())
+                all_area_names.update(area_names)
+                
+            except errors.MeilisearchApiError as e:
+                # 如果某个索引出现问题，记录错误但继续处理其他索引
+                print(f"获取索引 {index_name} 的地区名称时出错: {str(e)}")
+                continue
+            except errors.MeilisearchCommunicationError as e:
+                # 如果连接某个索引出现问题，记录错误但继续处理其他索引
+                print(f"连接索引 {index_name} 时出错: {str(e)}")
+                continue
+        
+        # 转换为排序后的列表
+        area_names_list = sorted(list(all_area_names))
+        
+        return {
+            "success": True,
+            "data": area_names_list,
+            "count": len(area_names_list),
+            "message": f"找到{len(area_names_list)}个不重复的地区名称"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"未知错误: {str(e)}",
+            "error_type": "unknown_error"
+        }
+
+
 if __name__ == "__main__":
     # 从环境变量获取服务器配置
     host = os.getenv("SERVER_HOST", "127.0.0.1")
