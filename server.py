@@ -17,7 +17,6 @@ def search_supply_demands(
     filter_conditions: Optional[Dict[str, Any]] = None,
     limit: int = 20,
     offset: int = 0,
-    attributes_to_retrieve: Optional[List[str]] = None,
     sort: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
@@ -28,7 +27,6 @@ def search_supply_demands(
         filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如createdAt, updatedAt, expiresAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
         limit: 返回结果数量限制，默认20
         offset: 偏移量，默认0
-        attributes_to_retrieve: 指定要返回的字段列表，可选
         sort: 排序规则列表，可选
 
     Returns:
@@ -54,7 +52,6 @@ def search_supply_demands(
                 "category": ["瓦楞纸箱", "包装盒"],
             },
             sort=["createdAt:desc"],
-            attributes_to_retrieve=["id", "title", "productName", "quantity", "price", "areaName", "companyName", "contactName", "contactPhone", "createdAt"],
             limit=10
         )
 
@@ -115,10 +112,6 @@ def search_supply_demands(
             'offset': offset
         }
 
-        # 添加可选参数
-        if attributes_to_retrieve:
-            search_params['attributesToRetrieve'] = attributes_to_retrieve
-
         if sort:
             search_params['sort'] = sort
 
@@ -166,7 +159,6 @@ def search_policies(
     filter_conditions: Optional[Dict[str, Any]] = None,
     limit: int = 20,
     offset: int = 0,
-    attributes_to_retrieve: Optional[List[str]] = None,
     sort: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
@@ -177,7 +169,6 @@ def search_policies(
         filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如publishDate, effectDate, expireDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
         limit: 返回结果数量限制，默认20
         offset: 偏移量，默认0
-        attributes_to_retrieve: 指定要返回的字段列表，可选
         sort: 排序规则列表，可选
 
     Returns:
@@ -240,7 +231,6 @@ def search_policies(
                 "status": "active"
             },
             sort=["publishDate:desc"],
-            attributes_to_retrieve=["id", "title", "category", "publishDate", "author", "areaNames"],
             limit=10
         )
     """
@@ -264,10 +254,6 @@ def search_policies(
             'offset': offset
         }
 
-        # 添加可选参数
-        if attributes_to_retrieve:
-            search_params['attributesToRetrieve'] = attributes_to_retrieve
-
         if sort:
             search_params['sort'] = sort
 
@@ -287,6 +273,152 @@ def search_policies(
             "data": hits,
             "count": len(hits),
             "message": f"找到{len(hits)}条政策信息"
+        }
+
+    except errors.MeilisearchApiError as e:
+        return {
+            "success": False,
+            "error": f"MeiliSearch API错误: {str(e)}",
+            "error_code": getattr(e, 'code', 'unknown')
+        }
+    except errors.MeilisearchCommunicationError as e:
+        return {
+            "success": False,
+            "error": f"MeiliSearch连接错误: {str(e)}",
+            "error_type": "communication_error"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"未知错误: {str(e)}",
+            "error_type": "unknown_error"
+        }
+
+
+@mcp.tool
+def search_companies(
+    query: str,
+    filter_conditions: Optional[Dict[str, Any]] = None,
+    limit: int = 20,
+    offset: int = 0,
+    sort: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """
+    查询MeiliSearch中的companies索引
+
+    Args:
+        query: 搜索关键词
+        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如establishDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
+        limit: 返回结果数量限制，默认20
+        offset: 偏移量，默认0
+        sort: 排序规则列表，可选
+
+    Returns:
+        搜索结果字典
+
+    企业索引字段说明:
+        - id: 唯一标识符
+        - name: 公司名称
+        - description: 公司描述
+        - industry: 行业
+        - companyType: 公司类型
+        - employeeCount: 员工数量
+        - registeredAddress: 注册地址
+        - contactName: 联系人姓名
+        - contactPhone: 联系电话
+        - email: 邮箱
+        - website: 网站
+        - establishDate: 成立日期
+        - registeredCapital: 注册资本
+        - legalPerson: 法人代表
+        - legalPersonPhone: 法人电话
+        - isActive: 是否激活
+        - areaName: 地区名称
+        - areaCode: 地区代码
+        - areaDescription: 地区描述
+        - areaId: 地区ID
+        - createdAt: 创建时间
+        - updatedAt: 更新时间
+
+    示例:
+        # 基本关键词搜索
+        search_companies("科技有限公司")
+
+        # 按行业筛选
+        search_companies(
+            "", 
+            filter_conditions={
+                "industry": "信息技术"
+            }
+        )
+
+        # 按地区搜索
+        search_companies(
+            "",
+            filter_conditions={
+                "areaName": "北京市"
+            }
+        )
+
+        # 按成立时间范围搜索
+        search_companies(
+            "",
+            filter_conditions={
+                "establishDate": {"gte": "2020-01-01T00:00:00.000Z", "lte": "2025-12-31T23:59:59.999Z"}
+            },
+            sort=["establishDate:desc"]
+        )
+
+        # 复合条件搜索
+        search_companies(
+            "软件",
+            filter_conditions={
+                "industry": ["信息技术", "软件开发"],
+                "isActive": True
+            },
+            sort=["createdAt:desc"],
+            limit=10
+        )
+    """
+    try:
+        # 从环境变量获取MeiliSearch配置
+        MEILISEARCH_URL = os.getenv("MEILISEARCH_URL", "http://localhost:7700")
+        MEILISEARCH_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY", "")
+
+        # 固定查询companies索引
+        INDEX_NAME = "companies"
+
+        # 创建MeiliSearch客户端
+        client = Client(MEILISEARCH_URL, MEILISEARCH_MASTER_KEY)
+
+        # 获取索引
+        index = client.index(INDEX_NAME)
+
+        # 构建搜索参数
+        search_params: dict[str, Any] = {
+            'hitsPerPage': limit,
+            'offset': offset
+        }
+
+        if sort:
+            search_params['sort'] = sort
+
+        # 处理筛选条件
+        if filter_conditions:
+            filter_expressions = _build_filter_expressions(filter_conditions)
+            if filter_expressions:
+                search_params['filter'] = filter_expressions
+
+        # 执行搜索
+        results = index.search(query, search_params)
+
+        # 安全地获取结果字段
+        hits = results.get("hits", [])
+        return {
+            "success": True,
+            "data": hits,
+            "count": len(hits),
+            "message": f"找到{len(hits)}条企业信息"
         }
 
     except errors.MeilisearchApiError as e:
