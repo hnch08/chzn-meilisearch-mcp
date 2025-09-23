@@ -8,6 +8,11 @@
 pip install -e .
 ```
 
+使用UV安装:
+```bash
+uv sync
+```
+
 ## 环境变量配置
 
 项目使用 `.env` 文件来配置环境变量。请根据需要修改 `.env` 文件中的配置：
@@ -29,6 +34,11 @@ SERVER_PORT=8800
 直接运行Python文件（使用代码中配置的HTTP方式）：
 ```bash
 python server.py
+```
+
+使用UV运行：
+```bash
+uv run server.py
 ```
 
 或者使用FastMCP CLI并指定传输方式：
