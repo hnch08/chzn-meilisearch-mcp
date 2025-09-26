@@ -329,7 +329,7 @@ def search_companies(
         - email: 邮箱
         - website: 网站
         - establishDate: 成立日期
-        - registeredCapital: 注册资本
+        - registeredCapital: 注册资本(单位是万元)
         - legalPerson: 法人代表
         - legalPersonPhone: 法人电话
         - isActive: 是否激活
