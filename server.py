@@ -78,7 +78,7 @@ def search_supply_demands(
         search_supply_demands(
             "",
             filter_conditions={
-                "areaName": "天元区"
+                "areaName": "石峰区"
             },
             sort=["createdAt:desc"]
         )
@@ -193,6 +193,7 @@ def search_policies(
         - updatedAt: 更新时间
         - areaNames: 地区名称列表
         - areaIds: 地区ID列表
+        - appliesToAllAreas: 是否适用于所有区域(1表示适用所有区域，0或不存在表示不适用)
 
     示例:
         # 基本关键词搜索
@@ -215,11 +216,11 @@ def search_policies(
             sort=["publishDate:desc"]
         )
 
-        # 按地区搜索
+        # 按地区搜索（会同时包含指定地区的政策和适用于所有区域的政策）
         search_policies(
             "",
             filter_conditions={
-                "areaNames": "湖南省"
+                "areaNames": "芦淞区"
             }
         )
 
@@ -259,9 +260,41 @@ def search_policies(
 
         # 处理筛选条件
         if filter_conditions:
-            filter_expressions = _build_filter_expressions(filter_conditions)
-            if filter_expressions:
-                search_params['filter'] = filter_expressions
+            # 特殊处理：如果筛选条件中包含areaNames，则额外添加appliesToAllAreas=1的条件
+            if "areaNames" in filter_conditions:
+                # 构建基础筛选条件（除了areaNames）
+                base_conditions = {k: v for k, v in filter_conditions.items() if k != "areaNames"}
+                base_expressions = _build_filter_expressions(base_conditions)
+                
+                # 构建areaNames筛选条件
+                area_conditions = {"areaNames": filter_conditions["areaNames"]}
+                area_expressions = _build_filter_expressions(area_conditions)
+                
+                # 构建appliesToAllAreas=1的条件
+                all_areas_expressions = _build_filter_expressions({"appliesToAllAreas": 1})
+                
+                # 组合所有条件
+                all_filters = []
+                if base_expressions:
+                    # 基础条件用AND连接
+                    all_filters.extend(base_expressions)
+                
+                # areaNames条件和appliesToAllAreas条件组成OR关系
+                if area_expressions and all_areas_expressions:
+                    area_filter = area_expressions[0]
+                    all_areas_filter = all_areas_expressions[0]
+                    combined_area_filter = f"({area_filter}) OR ({all_areas_filter})"
+                    all_filters.append(combined_area_filter)
+                
+                # 将所有筛选条件组合成一个字符串
+                if all_filters:
+                    search_params['filter'] = " AND ".join(all_filters)
+            else:
+                # 正常处理筛选条件
+                filter_expressions = _build_filter_expressions(filter_conditions)
+                if filter_expressions:
+                    # 将筛选条件组合成一个字符串
+                    search_params['filter'] = " AND ".join(filter_expressions)
 
         # 执行搜索
         results = index.search(query, search_params)
@@ -356,7 +389,7 @@ def search_companies(
         search_companies(
             "",
             filter_conditions={
-                "areaName": "北京市"
+                "areaName": "荷塘区"
             }
         )
 
@@ -533,7 +566,7 @@ def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
 @mcp.tool
 def get_area_names() -> Dict[str, Any]:
     """
-    获取所有索引中的地区名称(areaName)，包括companies和supply_demands
+    获取所有索引中的地区名称(areaName)，包括companies、supply_demands和policies索引中的areaNames数组字段
     
     Returns:
         包含所有地区名称列表的字典
@@ -546,9 +579,10 @@ def get_area_names() -> Dict[str, Any]:
         # 创建MeiliSearch客户端
         client = Client(MEILISEARCH_URL, MEILISEARCH_MASTER_KEY)
         
+        all_area_names = set()  # 使用集合避免重复
+        
         # 定义要查询的索引列表
         index_names = ["companies", "supply_demands"]
-        all_area_names = set()  # 使用集合避免重复
         
         # 遍历每个索引获取areaName
         for index_name in index_names:
@@ -577,6 +611,29 @@ def get_area_names() -> Dict[str, Any]:
                 # 如果连接某个索引出现问题，记录错误但继续处理其他索引
                 print(f"连接索引 {index_name} 时出错: {str(e)}")
                 continue
+        
+        # 单独处理policies索引，获取areaNames数组字段
+        try:
+            policies_index = client.index("policies")
+            
+            # 搜索所有文档，获取areaNames字段
+            search_params = {
+                'attributesToRetrieve': ['areaNames'],
+                'hitsPerPage': 1000  # 根据实际数据量调整
+            }
+            
+            results = policies_index.search("", search_params)
+            
+            # 从结果中提取所有areaNames数组中的地区名称
+            for hit in results.get('hits', []):
+                area_names_array = hit.get('areaNames', [])
+                if isinstance(area_names_array, list):
+                    all_area_names.update(area_names_array)
+                
+        except errors.MeilisearchApiError as e:
+            print(f"获取policies索引中的areaNames时出错: {str(e)}")
+        except errors.MeilisearchCommunicationError as e:
+            print(f"连接policies索引时出错: {str(e)}")
         
         # 转换为排序后的列表
         area_names_list = sorted(list(all_area_names))
