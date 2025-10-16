@@ -24,7 +24,7 @@ def search_supply_demands(
 
     Args:
         query: 搜索关键词
-        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如createdAt, updatedAt, expiresAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
+        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如createdAt, updatedAt, expiresAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"），系统会自动转换为时间戳进行筛选
         limit: 返回结果数量限制，默认20
         offset: 偏移量，默认0
         sort: 排序规则列表，可选
@@ -112,8 +112,10 @@ def search_supply_demands(
             'offset': offset
         }
 
+        # 处理排序字段
         if sort:
-            search_params['sort'] = sort
+            processed_sort = _process_sort_fields(sort)
+            search_params['sort'] = processed_sort
 
         # 处理筛选条件
         if filter_conditions:
@@ -166,10 +168,10 @@ def search_policies(
 
     Args:
         query: 搜索关键词
-        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如publishDate, effectDate, expireDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
+        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如publishDate, effectDate, expireDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"），系统会自动转换为时间戳进行筛选
         limit: 返回结果数量限制，默认20
         offset: 偏移量，默认0
-        sort: 排序规则列表，可选
+        sort: 排序规则列表，可选。注意：如果排序字段为时间字段，系统会自动转换为对应的timestamp字段进行排序
 
     Returns:
         搜索结果字典
@@ -255,8 +257,10 @@ def search_policies(
             'offset': offset
         }
 
+        # 处理排序字段
         if sort:
-            search_params['sort'] = sort
+            processed_sort = _process_sort_fields(sort)
+            search_params['sort'] = processed_sort
 
         # 处理筛选条件
         if filter_conditions:
@@ -341,10 +345,10 @@ def search_companies(
 
     Args:
         query: 搜索关键词
-        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如establishDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"）
+        filter_conditions: 筛选条件字典，可选。注意：如果筛选条件中包含时间字段（如establishDate, createdAt, updatedAt），时间值应使用ISO 8601格式字符串（例如："2025-09-09T07:43:16.910Z"），系统会自动转换为时间戳进行筛选
         limit: 返回结果数量限制，默认20
         offset: 偏移量，默认0
-        sort: 排序规则列表，可选
+        sort: 排序规则列表，可选。注意：如果排序字段为时间字段，系统会自动转换为对应的timestamp字段进行排序
 
     Returns:
         搜索结果字典
@@ -433,8 +437,10 @@ def search_companies(
             'offset': offset
         }
 
+        # 处理排序字段
         if sort:
-            search_params['sort'] = sort
+            processed_sort = _process_sort_fields(sort)
+            search_params['sort'] = processed_sort
 
         # 处理筛选条件
         if filter_conditions:
@@ -486,45 +492,104 @@ def _build_filter_expressions(filter_conditions: Dict[str, Any]) -> List[str]:
     """
     filter_expressions = []
 
-    # 定义时间字段列表
-    time_fields = ["createdAt", "updatedAt", "expiresAt"]
+    # 定义时间字段列表和对应的timestamp字段映射
+    time_fields = ["createdAt", "updatedAt", "expiresAt", "publishDate", "effectDate", "expireDate", "establishDate"]
+    time_field_mapping = {
+        "createdAt": "createdAtTimestamp",
+        "updatedAt": "updatedAtTimestamp",
+        "expiresAt": "expiresAtTimestamp",
+        "publishDate": "publishDateTimestamp",
+        "effectDate": "effectDateTimestamp",
+        "expireDate": "expireDateTimestamp",
+        "establishDate": "establishDateTimestamp"
+    }
 
     for key, value in filter_conditions.items():
         if value is None:
             continue
+
+        # 确定是否为时间字段
+        is_time_field = key in time_fields
+        
+        # 如果是时间字段，使用对应的timestamp字段名
+        field_name = time_field_mapping.get(key, key) if is_time_field else key
 
         if isinstance(value, list):
             # 处理数组值的情况 (IN查询)
             if len(value) > 0:
                 # 转义特殊字符并构建表达式
                 escaped_values = [_escape_filter_value(
-                    v, key in time_fields) for v in value]
+                    v, is_time_field) for v in value]
                 values_str = ", ".join(escaped_values)
-                filter_expressions.append(f"{key} IN [{values_str}]")
+                filter_expressions.append(f"{field_name} IN [{values_str}]")
         elif isinstance(value, dict):
             # 处理范围查询和其他复杂条件
             for op, val in value.items():
                 if op == "gt":
                     filter_expressions.append(
-                        f"{key} > {_escape_filter_value(val, key in time_fields)}")
+                        f"{field_name} > {_escape_filter_value(val, is_time_field)}")
                 elif op == "gte":
                     filter_expressions.append(
-                        f"{key} >= {_escape_filter_value(val, key in time_fields)}")
+                        f"{field_name} >= {_escape_filter_value(val, is_time_field)}")
                 elif op == "lt":
                     filter_expressions.append(
-                        f"{key} < {_escape_filter_value(val, key in time_fields)}")
+                        f"{field_name} < {_escape_filter_value(val, is_time_field)}")
                 elif op == "lte":
                     filter_expressions.append(
-                        f"{key} <= {_escape_filter_value(val, key in time_fields)}")
+                        f"{field_name} <= {_escape_filter_value(val, is_time_field)}")
                 elif op == "ne":
                     filter_expressions.append(
-                        f"{key} != {_escape_filter_value(val, key in time_fields)}")
+                        f"{field_name} != {_escape_filter_value(val, is_time_field)}")
         else:
             # 处理单个值的情况
             filter_expressions.append(
-                f"{key} = {_escape_filter_value(value, key in time_fields)}")
+                f"{field_name} = {_escape_filter_value(value, is_time_field)}")
     print(filter_expressions)
     return filter_expressions
+
+
+def _process_sort_fields(sort: Optional[List[str]]) -> Optional[List[str]]:
+    """
+    处理排序字段，将时间字段转换为对应的timestamp字段
+
+    Args:
+        sort: 排序规则列表，如 ["createdAt:desc", "updatedAt:asc"]
+
+    Returns:
+        处理后的排序规则列表
+    """
+    if not sort:
+        return sort
+
+    # 定义时间字段列表和对应的timestamp字段映射
+    time_field_mapping = {
+        "createdAt": "createdAtTimestamp",
+        "updatedAt": "updatedAtTimestamp",
+        "expiresAt": "expiresAtTimestamp",
+        "publishDate": "publishDateTimestamp",
+        "effectDate": "effectDateTimestamp",
+        "expireDate": "expireDateTimestamp",
+        "establishDate": "establishDateTimestamp"
+    }
+
+    processed_sort = []
+    for sort_field in sort:
+        # 分离字段名和排序方向
+        if ":" in sort_field:
+            field_name, direction = sort_field.split(":", 1)
+            # 如果是时间字段，使用对应的timestamp字段名
+            if field_name in time_field_mapping:
+                processed_sort.append(f"{time_field_mapping[field_name]}:{direction}")
+            else:
+                processed_sort.append(sort_field)
+        else:
+            # 只有字段名，没有排序方向
+            if sort_field in time_field_mapping:
+                processed_sort.append(time_field_mapping[sort_field])
+            else:
+                processed_sort.append(sort_field)
+    
+    return processed_sort
 
 
 def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
@@ -541,17 +606,24 @@ def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
     # 如果是时间字段且值是日期时间对象，则转换为ISO格式字符串
     if is_time_field and hasattr(value, 'isoformat'):
         value = value.isoformat().replace('+00:00', 'Z')
-    elif is_time_field and isinstance(value, (int, float)):
-        # 如果是时间戳，转换为日期时间对象再转为ISO格式
-        import datetime
+    elif is_time_field and isinstance(value, str):
+        # 如果是时间字段且值是ISO格式字符串，则转换为时间戳
         try:
-            # 假设是秒级时间戳
-            dt = datetime.datetime.fromtimestamp(
-                value, tz=datetime.timezone.utc)
-            value = dt.isoformat().replace('+00:00', 'Z')
-        except (ValueError, OSError):
-            # 如果转换失败，保持原值
+            import datetime
+            # 解析ISO格式的时间字符串
+            if value.endswith('Z'):
+                dt = datetime.datetime.fromisoformat(value[:-1]).replace(tzinfo=datetime.timezone.utc)
+            else:
+                dt = datetime.datetime.fromisoformat(value)
+            # 转换为时间戳（毫秒）
+            timestamp = int(dt.timestamp() * 1000)
+            value = timestamp
+        except (ValueError, TypeError):
+            # 如果解析失败，保持原值
             pass
+    elif is_time_field and isinstance(value, (int, float)):
+        # 如果是时间戳，保持原值
+        pass
 
     if isinstance(value, str):
         # 转义单引号并用单引号包围字符串
