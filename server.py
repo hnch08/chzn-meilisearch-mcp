@@ -32,6 +32,25 @@ def search_supply_demands(
     Returns:
         搜索结果字典
 
+    供需索引字段说明:
+        - id: 唯一标识符
+        - title: 标题
+        - description: 描述
+        - category: 分类
+        - type: 类型（1表示供应，2表示需求，4表示招标）
+        - companyName: 公司名称
+        - areaName: 地区名称
+        - price: 价格
+        - unit: 单位
+        - quantity: 数量
+        - contactName: 联系人姓名
+        - contactPhone: 联系电话
+        - email: 邮箱
+        - status: 状态
+        - createdAt: 创建时间
+        - updatedAt: 更新时间
+        - expiresAt: 过期时间/投标截止时间
+
     示例:
         # 基本关键词搜索
         search_supply_demands("瓦楞纸箱")
@@ -118,10 +137,38 @@ def search_supply_demands(
             search_params['sort'] = processed_sort
 
         # 处理筛选条件
-        if filter_conditions:
-            filter_expressions = _build_filter_expressions(filter_conditions)
-            if filter_expressions:
-                search_params['filter'] = filter_expressions
+        # 合并用户提供的筛选条件和默认的未过期条件
+        combined_filter_conditions = filter_conditions or {}
+        
+        # 添加默认的未过期条件：expiresAtTimestamp大于当前时间戳，或者expiresAtTimestamp不存在（永不过期）
+        import time
+        current_timestamp = int(time.time() * 1000)  # 当前时间戳（毫秒）
+        
+        # 如果用户没有提供expiresAt相关的筛选条件，则添加默认的未过期条件
+        if "expiresAt" not in combined_filter_conditions and "expiresAtTimestamp" not in combined_filter_conditions:
+            # 构建默认筛选条件表达式
+            # 条件1: expiresAtTimestamp大于当前时间戳（未过期）
+            # 条件2: expiresAtTimestamp不存在（未设置过期时间）
+            # 使用OR连接这两个条件
+            default_filter_expression = f"(expiresAtTimestamp > {current_timestamp} OR expiresAtTimestamp IS NULL)"
+            
+            if combined_filter_conditions:
+                # 先处理用户提供的筛选条件
+                user_filter_expressions = _build_filter_expressions(combined_filter_conditions)
+                if user_filter_expressions:
+                    # 将用户筛选条件和默认筛选条件组合
+                    # 用户条件之间用AND连接，与默认条件用AND连接
+                    user_filter_str = " AND ".join(user_filter_expressions)
+                    search_params['filter'] = f"{user_filter_str} AND {default_filter_expression}"
+            else:
+                # 没有用户筛选条件，只使用默认筛选条件
+                search_params['filter'] = default_filter_expression
+        else:
+            # 用户提供了expiresAt相关的筛选条件，使用用户提供的条件
+            if combined_filter_conditions:
+                filter_expressions = _build_filter_expressions(combined_filter_conditions)
+                if filter_expressions:
+                    search_params['filter'] = " AND ".join(filter_expressions)
 
         # 执行搜索
         results = index.search(query, search_params)
