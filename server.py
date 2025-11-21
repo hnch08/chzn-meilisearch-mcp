@@ -139,11 +139,11 @@ def search_supply_demands(
         # 处理筛选条件
         # 合并用户提供的筛选条件和默认的未过期条件
         combined_filter_conditions = filter_conditions or {}
-        
+
         # 添加默认的未过期条件：expiresAtTimestamp大于当前时间戳，或者expiresAtTimestamp不存在（永不过期）
         import time
         current_timestamp = int(time.time() * 1000)  # 当前时间戳（毫秒）
-        
+
         # 如果用户没有提供expiresAt相关的筛选条件，则添加默认的未过期条件
         if "expiresAt" not in combined_filter_conditions and "expiresAtTimestamp" not in combined_filter_conditions:
             # 构建默认筛选条件表达式
@@ -151,10 +151,11 @@ def search_supply_demands(
             # 条件2: expiresAtTimestamp不存在（未设置过期时间）
             # 使用OR连接这两个条件
             default_filter_expression = f"(expiresAtTimestamp > {current_timestamp} OR expiresAtTimestamp IS NULL)"
-            
+
             if combined_filter_conditions:
                 # 先处理用户提供的筛选条件
-                user_filter_expressions = _build_filter_expressions(combined_filter_conditions)
+                user_filter_expressions = _build_filter_expressions(
+                    combined_filter_conditions)
                 if user_filter_expressions:
                     # 将用户筛选条件和默认筛选条件组合
                     # 用户条件之间用AND连接，与默认条件用AND连接
@@ -166,7 +167,8 @@ def search_supply_demands(
         else:
             # 用户提供了expiresAt相关的筛选条件，使用用户提供的条件
             if combined_filter_conditions:
-                filter_expressions = _build_filter_expressions(combined_filter_conditions)
+                filter_expressions = _build_filter_expressions(
+                    combined_filter_conditions)
                 if filter_expressions:
                     search_params['filter'] = " AND ".join(filter_expressions)
 
@@ -230,19 +232,10 @@ def search_policies(
         - category: 分类
         - status: 状态
         - statusText: 状态文本
-        - publishDate: 发布日期
         - effectDate: 生效日期
         - expireDate: 失效日期
-        - author: 作者
-        - tags: 标签
-        - priority: 优先级
-        - viewCount: 查看次数
-        - version: 版本
-        - createdAt: 创建时间
+        - author: 作者/发布部门
         - updatedAt: 更新时间
-        - areaNames: 地区名称列表
-        - areaIds: 地区ID列表
-        - appliesToAllAreas: 是否适用于所有区域(1表示适用所有区域，0或不存在表示不适用)
 
     示例:
         # 基本关键词搜索
@@ -260,17 +253,9 @@ def search_policies(
         search_policies(
             "",
             filter_conditions={
-                "publishDate": {"gte": "2025-01-01T00:00:00.000Z", "lte": "2025-12-31T23:59:59.999Z"}
+                "effectDate": {"gte": "2025-01-01T00:00:00.000Z", "lte": "2025-12-31T23:59:59.999Z"}
             },
-            sort=["publishDate:desc"]
-        )
-
-        # 按地区搜索（会同时包含指定地区的政策和适用于所有区域的政策）
-        search_policies(
-            "",
-            filter_conditions={
-                "areaNames": "芦淞区"
-            }
+            sort=["effectDate:desc"]
         )
 
         # 复合条件搜索
@@ -311,41 +296,41 @@ def search_policies(
 
         # 处理筛选条件
         if filter_conditions:
-            # 特殊处理：如果筛选条件中包含areaNames，则额外添加appliesToAllAreas=1的条件
-            if "areaNames" in filter_conditions:
-                # 构建基础筛选条件（除了areaNames）
-                base_conditions = {k: v for k, v in filter_conditions.items() if k != "areaNames"}
-                base_expressions = _build_filter_expressions(base_conditions)
-                
-                # 构建areaNames筛选条件
-                area_conditions = {"areaNames": filter_conditions["areaNames"]}
-                area_expressions = _build_filter_expressions(area_conditions)
-                
-                # 构建appliesToAllAreas=1的条件
-                all_areas_expressions = _build_filter_expressions({"appliesToAllAreas": 1})
-                
-                # 组合所有条件
-                all_filters = []
-                if base_expressions:
-                    # 基础条件用AND连接
-                    all_filters.extend(base_expressions)
-                
-                # areaNames条件和appliesToAllAreas条件组成OR关系
-                if area_expressions and all_areas_expressions:
-                    area_filter = area_expressions[0]
-                    all_areas_filter = all_areas_expressions[0]
-                    combined_area_filter = f"({area_filter}) OR ({all_areas_filter})"
-                    all_filters.append(combined_area_filter)
-                
-                # 将所有筛选条件组合成一个字符串
-                if all_filters:
-                    search_params['filter'] = " AND ".join(all_filters)
-            else:
-                # 正常处理筛选条件
-                filter_expressions = _build_filter_expressions(filter_conditions)
-                if filter_expressions:
-                    # 将筛选条件组合成一个字符串
-                    search_params['filter'] = " AND ".join(filter_expressions)
+            # # 特殊处理：如果筛选条件中包含areaNames，则额外添加appliesToAllAreas=1的条件
+            # if "areaNames" in filter_conditions:
+            #     # 构建基础筛选条件（除了areaNames）
+            #     base_conditions = {k: v for k, v in filter_conditions.items() if k != "areaNames"}
+            #     base_expressions = _build_filter_expressions(base_conditions)
+
+            #     # 构建areaNames筛选条件
+            #     area_conditions = {"areaNames": filter_conditions["areaNames"]}
+            #     area_expressions = _build_filter_expressions(area_conditions)
+
+            #     # 构建appliesToAllAreas=1的条件
+            #     all_areas_expressions = _build_filter_expressions({"appliesToAllAreas": 1})
+
+            #     # 组合所有条件
+            #     all_filters = []
+            #     if base_expressions:
+            #         # 基础条件用AND连接
+            #         all_filters.extend(base_expressions)
+
+            #     # areaNames条件和appliesToAllAreas条件组成OR关系
+            #     if area_expressions and all_areas_expressions:
+            #         area_filter = area_expressions[0]
+            #         all_areas_filter = all_areas_expressions[0]
+            #         combined_area_filter = f"({area_filter}) OR ({all_areas_filter})"
+            #         all_filters.append(combined_area_filter)
+
+            #     # 将所有筛选条件组合成一个字符串
+            #     if all_filters:
+            #         search_params['filter'] = " AND ".join(all_filters)
+            # else:
+            # 正常处理筛选条件
+            filter_expressions = _build_filter_expressions(filter_conditions)
+            if filter_expressions:
+                # 将筛选条件组合成一个字符串
+                search_params['filter'] = " AND ".join(filter_expressions)
 
         # 执行搜索
         results = index.search(query, search_params)
@@ -540,7 +525,8 @@ def _build_filter_expressions(filter_conditions: Dict[str, Any]) -> List[str]:
     filter_expressions = []
 
     # 定义时间字段列表和对应的timestamp字段映射
-    time_fields = ["createdAt", "updatedAt", "expiresAt", "publishDate", "effectDate", "expireDate", "establishDate"]
+    time_fields = ["createdAt", "updatedAt", "expiresAt",
+                   "publishDate", "effectDate", "expireDate", "establishDate"]
     time_field_mapping = {
         "createdAt": "createdAtTimestamp",
         "updatedAt": "updatedAtTimestamp",
@@ -557,7 +543,7 @@ def _build_filter_expressions(filter_conditions: Dict[str, Any]) -> List[str]:
 
         # 确定是否为时间字段
         is_time_field = key in time_fields
-        
+
         # 如果是时间字段，使用对应的timestamp字段名
         field_name = time_field_mapping.get(key, key) if is_time_field else key
 
@@ -626,7 +612,8 @@ def _process_sort_fields(sort: Optional[List[str]]) -> Optional[List[str]]:
             field_name, direction = sort_field.split(":", 1)
             # 如果是时间字段，使用对应的timestamp字段名
             if field_name in time_field_mapping:
-                processed_sort.append(f"{time_field_mapping[field_name]}:{direction}")
+                processed_sort.append(
+                    f"{time_field_mapping[field_name]}:{direction}")
             else:
                 processed_sort.append(sort_field)
         else:
@@ -635,7 +622,7 @@ def _process_sort_fields(sort: Optional[List[str]]) -> Optional[List[str]]:
                 processed_sort.append(time_field_mapping[sort_field])
             else:
                 processed_sort.append(sort_field)
-    
+
     return processed_sort
 
 
@@ -659,7 +646,8 @@ def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
             import datetime
             # 解析ISO格式的时间字符串
             if value.endswith('Z'):
-                dt = datetime.datetime.fromisoformat(value[:-1]).replace(tzinfo=datetime.timezone.utc)
+                dt = datetime.datetime.fromisoformat(
+                    value[:-1]).replace(tzinfo=datetime.timezone.utc)
             else:
                 dt = datetime.datetime.fromisoformat(value)
             # 转换为时间戳（毫秒）
@@ -686,7 +674,7 @@ def _escape_filter_value(value: Any, is_time_field: bool = False) -> str:
 def get_area_names() -> Dict[str, Any]:
     """
     获取所有索引中的地区名称(areaName)，包括companies、supply_demands和policies索引中的areaNames数组字段
-    
+
     Returns:
         包含所有地区名称列表的字典
     """
@@ -697,31 +685,32 @@ def get_area_names() -> Dict[str, Any]:
 
         # 创建MeiliSearch客户端
         client = Client(MEILISEARCH_URL, MEILISEARCH_MASTER_KEY)
-        
+
         all_area_names = set()  # 使用集合避免重复
-        
+
         # 定义要查询的索引列表
         index_names = ["companies", "supply_demands"]
-        
+
         # 遍历每个索引获取areaName
         for index_name in index_names:
             try:
                 # 获取索引
                 index = client.index(index_name)
-                
+
                 # 执行搜索并获取facet分布
                 search_params = {
                     'facets': ['areaName'],
                     'hitsPerPage': 0  # 我们只需要facet信息，不需要实际的文档
                 }
-                
+
                 results = index.search("", search_params)
-                
+
                 # 从facetDistribution中提取地区名称
                 facet_distribution = results.get("facetDistribution", {})
-                area_names = list(facet_distribution.get("areaName", {}).keys())
+                area_names = list(
+                    facet_distribution.get("areaName", {}).keys())
                 all_area_names.update(area_names)
-                
+
             except errors.MeilisearchApiError as e:
                 # 如果某个索引出现问题，记录错误但继续处理其他索引
                 print(f"获取索引 {index_name} 的地区名称时出错: {str(e)}")
@@ -730,40 +719,40 @@ def get_area_names() -> Dict[str, Any]:
                 # 如果连接某个索引出现问题，记录错误但继续处理其他索引
                 print(f"连接索引 {index_name} 时出错: {str(e)}")
                 continue
-        
+
         # 单独处理policies索引，获取areaNames数组字段
         try:
             policies_index = client.index("policies")
-            
+
             # 搜索所有文档，获取areaNames字段
             search_params = {
                 'attributesToRetrieve': ['areaNames'],
                 'hitsPerPage': 1000  # 根据实际数据量调整
             }
-            
+
             results = policies_index.search("", search_params)
-            
+
             # 从结果中提取所有areaNames数组中的地区名称
             for hit in results.get('hits', []):
                 area_names_array = hit.get('areaNames', [])
                 if isinstance(area_names_array, list):
                     all_area_names.update(area_names_array)
-                
+
         except errors.MeilisearchApiError as e:
             print(f"获取policies索引中的areaNames时出错: {str(e)}")
         except errors.MeilisearchCommunicationError as e:
             print(f"连接policies索引时出错: {str(e)}")
-        
+
         # 转换为排序后的列表
         area_names_list = sorted(list(all_area_names))
-        
+
         return {
             "success": True,
             "data": area_names_list,
             "count": len(area_names_list),
             "message": f"找到{len(area_names_list)}个不重复的地区名称"
         }
-        
+
     except Exception as e:
         return {
             "success": False,
